@@ -1,0 +1,8 @@
+node_modules/
+wallets/
+.env
+master.json
+dist/
+results/
+*.pem
+*.json.bak

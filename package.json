@@ -1,0 +1,35 @@
+{
+  "name": "guildwars-crossover",
+  "version": "1.0.0",
+  "description": "MultiversX Guild Wars — Challenge 3: Crossover (Cross-Shard Sprint)",
+  "scripts": {
+    "create-wallets": "ts-node src/createWallets.ts",
+    "split": "ts-node src/split.ts",
+    "distribute": "ts-node src/distribute.ts",
+    "spray": "ts-node src/spray.ts",
+    "monitor": "ts-node src/monitor.ts",
+    "monitor-watch": "ts-node src/monitor.ts -- --watch",
+    "dashboard": "ts-node src/dashboard.ts",
+    "summarize": "ts-node src/summarize.ts",
+    "solo-p1": "ts-node src/spray.ts --part 1",
+    "solo-p2": "ts-node src/spray.ts --part 2",
+    "test-spray": "ts-node src/spray.ts --part 1 --count 5 --duration 1",
+    "EnRich-p1": "ts-node src/spray.ts --part 1 --keys-file wallets/keys_part1_EnRich.json",
+    "CreativeX-p1": "ts-node src/spray.ts --part 1 --keys-file wallets/keys_part1_CreativeX.json",
+    "Evangel-p1": "ts-node src/spray.ts --part 1 --keys-file wallets/keys_part1_Evangel.json",
+    "EnRich-p2": "ts-node src/spray.ts --part 2 --keys-file wallets/keys_part2_EnRich.json",
+    "CreativeX-p2": "ts-node src/spray.ts --part 2 --keys-file wallets/keys_part2_CreativeX.json",
+    "Evangel-p2": "ts-node src/spray.ts --part 2 --keys-file wallets/keys_part2_Evangel.json"
+  },
+  "dependencies": {
+    "@multiversx/sdk-core": "^15.0.0",
+    "@multiversx/sdk-wallet": "^4.6.0",
+    "bignumber.js": "^9.1.2",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  }
+}
