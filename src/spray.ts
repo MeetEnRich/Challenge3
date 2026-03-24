@@ -178,34 +178,20 @@ async function main() {
     clientName: "guildwars-spray",
     timeout: 15000,
   });
-  const networkConfig = await provider.getNetworkConfig();
-  const chainID       = networkConfig.chainID;
+  // BYPASS: The BoN API is returning timeouts on /network/config under heavy load
+  const chainID = "B"; // Hardcoded Shadowfork Chain ID
   console.log(`  Network       : ${CONFIG.API_URL}  |  Chain: ${chainID}\n`);
 
-  // ── Fetch nonces in parallel ─────────────────────────────
-  console.log("  Fetching nonces...");
+  // ── BYPASS Fetch nonces for INSTANT START ────────────────
+  console.log("  Bypassing nonce fetch for instant start (assuming nonce 0)...");
   const nonceMap    = new Map<string, bigint>();
   const balanceMap  = new Map<string, bigint>();
-  const NONCE_BATCH = 20;
+  const expectedBal = PART === 2 ? CONFIG.PART2_EGLD_PER_WALLET : CONFIG.PART1_EGLD_PER_WALLET;
 
-  for (let i = 0; i < wallets.length; i += NONCE_BATCH) {
-    const batch = wallets.slice(i, i + NONCE_BATCH);
-    await Promise.all(
-      batch.map(async (w) => {
-        try {
-          const acct = await provider.getAccount(Address.newFromBech32(w.address));
-          nonceMap.set(w.address, BigInt(acct.nonce));
-          balanceMap.set(w.address, BigInt(acct.balance.toString()));
-        } catch {
-          nonceMap.set(w.address, 0n);
-          balanceMap.set(w.address, 0n);
-        }
-      })
-    );
-    await sleep(200); // Slow down fetch to respect rate limit
-    process.stdout.write(`\r  Nonces: ${Math.min(i + NONCE_BATCH, wallets.length)}/${wallets.length}   `);
+  for (const w of wallets) {
+    nonceMap.set(w.address, 0n);
+    balanceMap.set(w.address, BigInt(expectedBal.toString()));
   }
-  process.stdout.write("\n");
 
   // ── Filter out dry wallets (0 balance) ───────────────────
   const liveWallets = wallets.filter((w) => {
@@ -229,10 +215,8 @@ async function main() {
   }
 
   // Compute max txs per wallet for Part 2
-  if (PART === 2) {
-    const maxPerWallet = Math.floor(Number(CONFIG.PART2_EGLD_PER_WALLET) / Number(COST_PER_TX));
-    console.log(`\n  Part 2 cap    : ~${maxPerWallet} txs/wallet (budget-limited)`);
-  }
+  // We no longer have a per-wallet cap because the funds are transferred, NOT burned!
+  // The wallets will infinitely circulate the EGLD until the 0.00005 gas fee slowly drains them.
 
   console.log(`\n  Window closes in : ${(msRemaining / 60000).toFixed(1)} min`);
   console.log(`  Batch size       : ${CONFIG.BATCH_SIZE} txs/wallet/round`);
@@ -319,26 +303,23 @@ async function walletLoop(
   let   balance   = initBalance;
   let   receiverIdx = 0;
 
-  // Part 2: compute max txs based on budget
-  const maxTxs = PART === 2
-    ? Math.floor(Number(balance) / Number(COST_PER_TX))
-    : Infinity;
-  let walletTxCount = 0;
-
   while (Date.now() < endTime) {
-    // Budget check
-    if (PART === 2 && walletTxCount >= maxTxs) break;
-    if (balance < COST_PER_TX) break;
+    // If waiting for incoming funds in circular route, just sleep
+    if (balance < COST_PER_TX) {
+      await sleep(1000);
+      try {
+        const netAcct = await provider.getAccount(sender);
+        balance = BigInt(netAcct.balance.toString());
+      } catch { /* ignore */ }
+      continue;
+    }
 
-    const batchSize = PART === 2
-      ? Math.min(CONFIG.BATCH_SIZE, maxTxs - walletTxCount)
-      : CONFIG.BATCH_SIZE;
+    const batchSize = CONFIG.BATCH_SIZE;
 
     const batch: Transaction[] = [];
 
     for (let i = 0; i < batchSize; i++) {
       if (Date.now() >= endTime) break;
-      if (PART === 2 && walletTxCount + batch.length >= maxTxs) break;
       if (balance < COST_PER_TX * BigInt(batch.length + 1)) break;
 
       // Round-robin through cross-shard receivers
@@ -378,11 +359,9 @@ async function walletLoop(
       globalCrossShardTx   += batch.length;
       globalFeesSpent      += batchFees;
       balance              -= batchFees;
-      walletTxCount        += batch.length;
       continue;
     }
-
-
+    
     try {
       await sendRawTransactions(batch, CONFIG.API_URL);
       const batchFees = COST_PER_TX * BigInt(batch.length);
@@ -394,7 +373,6 @@ async function walletLoop(
       globalCrossShardTx   += batch.length; // ALL our txs are cross-shard by design
       globalFeesSpent      += batchFees;
       balance              -= batchFees;
-      walletTxCount        += batch.length;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (wStats.errors.length < 5) wStats.errors.push(msg.slice(0, 120));
@@ -408,9 +386,9 @@ async function walletLoop(
       if (msg.includes("500") || msg.includes("502") || msg.includes("Internal Server") || msg.includes("429")) {
         nonce -= BigInt(batch.length);
         await sleep(300); // Wait longer for rate limits
-      } else if (msg.toLowerCase().includes("nonce") || msg.toLowerCase().includes("mempool")) {
+      } else if (msg.toLowerCase().includes("nonce") || msg.toLowerCase().includes("mempool") || msg.toLowerCase().includes("fund") || msg.toLowerCase().includes("insufficient")) {
         try {
-          // Dynamic mempool backoff
+          // Dynamic mempool or funds backoff
           const netAcct = await provider.getAccount(sender);
           nonce   = BigInt(netAcct.nonce);
           balance = BigInt(netAcct.balance.toString());

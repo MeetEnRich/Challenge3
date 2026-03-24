@@ -55,9 +55,9 @@ export const CONFIG = {
   PART1_FEE_BUDGET:      2000,                                // 2000 EGLD total
 
   // ── Part 2 params ─────────────────────────────────────────
-  PART2_EGLD_PER_WALLET: BigInt("1000000000000000000"),       // 1.0 EGLD
+  PART2_EGLD_PER_WALLET: BigInt("760000000000000000"),        // 0.76 EGLD (adjusted for 382 EGLD GL budget)
   PART2_MIN_TX_VALUE:    BigInt("10000000000000000"),          // 0.01 EGLD
-  PART2_FEE_BUDGET:      500,                                 // 500 EGLD total
+  PART2_FEE_BUDGET:      382,                                 // 382 EGLD roughly
 
   // ── Transaction params ────────────────────────────────────
   GAS_LIMIT:  50_000,
@@ -67,9 +67,9 @@ export const CONFIG = {
   FEE_PER_TX: BigInt("50000000000000"),  // 0.00005 EGLD in atoms
 
   // ── Spray tuning ──────────────────────────────────────────
-  BATCH_SIZE:          30,      // reduced from 100 to prevent event loop block & gateway timeouts
+  BATCH_SIZE:          100,     // maximize batch size so each wallet fires 1 single HTTP request
   CONCURRENT_WALLETS:  500,     // all wallets fire simultaneously
-  STAGGER_MS:          30,      // ms between wallet launches (spreads load over 15s)
+  STAGGER_MS:          5,       // ultra-fast 5ms stagger (all 500 launch in 2.5 seconds)
 
   // ── Window timing (UTC → maps to local system clock) ──────
   // All times in HH:MM LOCAL (your system auto-converts)
