@@ -264,6 +264,12 @@ header{
 .sc0{color:var(--cyan)}.sc1{color:var(--blue)}.sc2{color:var(--purple)}
 .shard-pct{font-size:.62rem;color:var(--dim);margin-top:3px}
 
+/* ── Summary Grid ── */
+.summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 12px; }
+.sg-item { background: rgba(255,255,255,0.03); padding: 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+.sg-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px; }
+.sg-val { font-size: 1.5rem; font-weight: 700; color: var(--fg); }
+
 /* ── Bottom grid ── */
 .bottom{display:grid;grid-template-columns:1fr 340px;gap:12px;margin-bottom:20px}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
@@ -283,6 +289,18 @@ tbody td{padding:6px;border-bottom:1px solid rgba(62,72,105,.12);
 .st1{background:rgba(59,130,246,.1);color:var(--blue)}
 .st2{background:rgba(167,139,250,.1);color:var(--purple)}
 
+/* ── Modal ── */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.2s; }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-content { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 90%; max-width: 650px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); transform: translateY(20px); transition: 0.3s; }
+.modal-overlay.active .modal-content { transform: translateY(0); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.modal-title { font-size: 1.1rem; font-weight: 700; color: var(--fg); text-transform: uppercase; letter-spacing: 0.05em; }
+.modal-close { background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; line-height: 1; margin-top: -5px; }
+.modal-close:hover { color: var(--rose); }
+.summary-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.split-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; }
+
 /* ── Footer ── */
 .footer{text-align:center;padding:12px;font-size:.62rem;color:var(--dim)}
 
@@ -292,9 +310,12 @@ tbody td{padding:6px;border-bottom:1px solid rgba(62,72,105,.12);
   .shard-grid{grid-template-columns:1fr}
   .hero-count{font-size:3rem}
 }
+@keyframes scanline { 0% { transform: translateX(-100vw); } 100% { transform: translateX(100vw); } }
+.scan-line { position: fixed; top: 0; left: 0; width: 50vw; height: 3px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); animation: scanline 1.5s linear infinite; z-index: 9999; pointer-events: none; box-shadow: 0 0 10px var(--cyan); }
 </style>
 </head>
 <body>
+<div class="scan-line"></div>
 
 <header>
   <div class="logo">
@@ -305,6 +326,7 @@ tbody td{padding:6px;border-bottom:1px solid rgba(62,72,105,.12);
     </div>
   </div>
   <div class="header-right">
+    <button class="reset-btn" style="border-color:var(--cyan);color:var(--cyan)" onclick="document.getElementById('summaryModal').classList.add('active')">View Summary</button>
     <button class="reset-btn" onclick="resetLogs()">Reset Data</button>
     <div class="clock" id="clock"></div>
     <div class="live-badge">LIVE</div>
@@ -404,22 +426,34 @@ tbody td{padding:6px;border-bottom:1px solid rgba(62,72,105,.12);
     </div>
   </div>
 
-  <!-- Chart + Top wallets -->
-  <div class="bottom">
-    <div class="panel">
-      <div class="panel-title">Throughput Over Time (tx/s)</div>
-      <div class="chart-wrap"><canvas id="chart"></canvas></div>
-    </div>
-    <div class="panel">
-      <div class="panel-title">Top Performing Wallets</div>
-      <div style="max-height:220px;overflow-y:auto">
-      <table>
-        <thead><tr><th>#</th><th>Address</th><th>Shard</th><th>Sent</th></tr></thead>
-        <tbody id="top-wallets"></tbody>
-      </table>
+  <!-- Summary Modal -->
+  <div class="modal-overlay" id="summaryModal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <div class="modal-title">Challenge Summary Report</div>
+        <button class="modal-close" onclick="document.getElementById('summaryModal').classList.remove('active')">×</button>
+      </div>
+      <div class="summary-split">
+        <div class="split-card">
+          <div style="color:var(--cyan);font-weight:700;margin-bottom:12px;text-transform:uppercase;font-size:0.8rem;letter-spacing:0.05em">Part 1 (Capacity)</div>
+          <div class="sg-item" style="padding:10px;margin-bottom:8px"><span class="sg-label">Sent / OK</span><div class="sg-val" style="font-size:1.1rem"><span id="m-p1-sent">0</span> / <span id="m-p1-ok" style="color:var(--green)">0</span></div></div>
+          <div class="sg-item" style="padding:10px"><span class="sg-label">Fees Used</span><div class="sg-val" id="m-p1-fees" style="font-size:1.1rem;color:var(--amber)">0 EGLD</div></div>
+        </div>
+        <div class="split-card">
+          <div style="color:var(--purple);font-weight:700;margin-bottom:12px;text-transform:uppercase;font-size:0.8rem;letter-spacing:0.05em">Part 2 (Capability)</div>
+          <div class="sg-item" style="padding:10px;margin-bottom:8px"><span class="sg-label">Sent / OK</span><div class="sg-val" style="font-size:1.1rem"><span id="m-p2-sent">0</span> / <span id="m-p2-ok" style="color:var(--green)">0</span></div></div>
+          <div class="sg-item" style="padding:10px"><span class="sg-label">Fees Used</span><div class="sg-val" id="m-p2-fees" style="font-size:1.1rem;color:var(--amber)">0 EGLD</div></div>
+        </div>
+      </div>
+      <div class="panel-title" style="margin-top:20px;margin-bottom:12px">Grand Totals</div>
+      <div class="summary-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:0;">
+        <div class="sg-item"><span class="sg-label">1M Bonus Status</span><div class="sg-val" id="sum-bonus" style="font-size:1.1rem">❌ Not Reached</div></div>
+        <div class="sg-item"><span class="sg-label">Total Cross-Shard</span><div class="sg-val" id="sum-ok-grand" style="font-size:1.1rem;color:var(--green)">0</div></div>
+        <div class="sg-item"><span class="sg-label">Total Fees</span><div class="sg-val" id="sum-fees-grand" style="font-size:1.1rem;color:var(--amber)">0 EGLD</div></div>
       </div>
     </div>
   </div>
+
 </div>
 
 <div class="footer" id="footer">Connecting to spray engine…</div>
@@ -438,39 +472,7 @@ async function resetLogs(){
   if(!confirm('Clear all local spray logs?')) return;
   await fetch('/api/reset', {method:'POST'});
   document.getElementById('footer').textContent = 'Logs cleared. Waiting for new spray...';
-  // Clear charts instantly
-  chart.data.labels = [];
-  chart.data.datasets[0].data = [];
-  chart.update();
 }
-
-// Chart
-const ctx = document.getElementById('chart').getContext('2d');
-const chart = new Chart(ctx, {
-  type:'line',
-  data:{
-    labels:[],
-    datasets:[{
-      label:'Cross-Shard tx/s',
-      data:[],
-      borderColor:'#23F7DD',
-      backgroundColor:'rgba(35,247,221,.06)',
-      borderWidth:2,pointRadius:0,fill:true,tension:.4,
-    }]
-  },
-  options:{
-    responsive:true,maintainAspectRatio:false,animation:false,
-    plugins:{legend:{display:false}},
-    scales:{
-      x:{display:false},
-      y:{
-        grid:{color:'rgba(62,72,105,.2)'},
-        ticks:{color:'#475569',font:{family:"'JetBrains Mono'",size:10}},
-        beginAtZero:true,
-      }
-    }
-  }
-});
 
 let prevCross = 0;
 let prevTime = Date.now();
@@ -498,7 +500,7 @@ async function refresh(){
     set('k-rate', d.rate.toLocaleString() + ' tx/s');
 
     // Part 1
-    set('p1-cross', d.part1.cross.toLocaleString());
+    set('p1-cross', d.part1.crossShard.toLocaleString());
     set('p1-sent', d.part1.sent.toLocaleString());
     set('p1-fees', parseFloat(d.part1.fees).toFixed(4));
     set('p1-elapsed', d.part1.elapsed.toFixed(0) + 's');
@@ -508,7 +510,7 @@ async function refresh(){
     set('p1-bused', parseFloat(d.part1.fees).toFixed(2) + ' EGLD used');
 
     // Part 2
-    set('p2-cross', d.part2.cross.toLocaleString());
+    set('p2-cross', d.part2.crossShard.toLocaleString());
     set('p2-sent', d.part2.sent.toLocaleString());
     set('p2-fees', parseFloat(d.part2.fees).toFixed(4));
     set('p2-elapsed', d.part2.elapsed.toFixed(0) + 's');
@@ -524,26 +526,19 @@ async function refresh(){
       set('sf-'+i+'-pct', ((v/sTotal)*100).toFixed(1)+'% of volume');
     });
 
-    // Chart — instantaneous rate
-    const instRate = dt > 0 ? Math.round((d.totalCross - prevCross) / dt) : d.rate;
-    prevCross = d.totalCross;
-    if(chart.data.labels.length > 90){chart.data.labels.shift();chart.data.datasets[0].data.shift()}
-    chart.data.labels.push(new Date().toLocaleTimeString());
-    chart.data.datasets[0].data.push(instRate > 0 ? instRate : d.rate);
-    chart.update('none');
+    // Summary Modal Update
+    set('m-p1-sent', d.part1.sent.toLocaleString());
+    set('m-p1-ok', d.part1.success.toLocaleString());
+    set('m-p1-fees', parseFloat(d.part1.fees).toFixed(4) + ' EGLD');
+    
+    set('m-p2-sent', d.part2.sent.toLocaleString());
+    set('m-p2-ok', d.part2.success.toLocaleString());
+    set('m-p2-fees', parseFloat(d.part2.fees).toFixed(4) + ' EGLD');
 
-    // Top wallets
-    const tbody = document.getElementById('top-wallets');
-    tbody.innerHTML = (d.topWallets||[]).map((w,i) => {
-      const addr = w.address.slice(0,6)+'…'+w.address.slice(-4);
-      const cls = 'st'+w.shard;
-      return '<tr>'
-        +'<td style="color:var(--dim)">'+(i+1)+'</td>'
-        +'<td style="color:var(--cyan)">'+addr+'</td>'
-        +'<td><span class="shard-tag '+cls+'">S'+w.shard+'</span></td>'
-        +'<td style="font-weight:600">'+w.sent.toLocaleString()+'</td>'
-        +'</tr>';
-    }).join('');
+    set('sum-ok-grand', d.totalCross.toLocaleString());
+    set('sum-fees-grand', parseFloat(d.totalFees).toFixed(4) + ' EGLD');
+    const bonus = d.totalCross >= 1000000 ? '✅ REACHED!' : '❌ ' + d.totalCross.toLocaleString() + ' / 1M';
+    set('sum-bonus', bonus);
 
     set('footer', 'Last update: '+new Date().toLocaleTimeString()+'  ·  Auto-refresh 2s  ·  ⚠️ Internal tracking only — do not trust live leaderboard');
   }catch(e){
@@ -582,8 +577,8 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
       res.end(JSON.stringify({
         totalCross: 0, totalSent: 0, totalSuccess: 0, totalFailed: 0,
         totalFees: "0", rate: 0, elapsed: 0,
-        part1: { cross: 0, sent: 0, fees: "0", budget: 2000, elapsed: 0, shardSent: [0,0,0] },
-        part2: { cross: 0, sent: 0, fees: "0", budget: 500, elapsed: 0, shardSent: [0,0,0] },
+        part1: { crossShard: 0, sent: 0, success: 0, failed: 0, fees: "0", budget: 2000, elapsed: 0, shardSent: [0,0,0] },
+        part2: { crossShard: 0, sent: 0, success: 0, failed: 0, fees: "0", budget: 500, elapsed: 0, shardSent: [0,0,0] },
         shardSent: [0,0,0], topWallets: [], activeWallets: 0, totalWallets: 0,
       }));
     }

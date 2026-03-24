@@ -21,8 +21,53 @@ import {
   UserSecretKey,
   TransactionComputer,
 } from "@multiversx/sdk-core";
-import * as fs   from "fs";
-import * as path from "path";
+import * as fs    from "fs";
+import * as path  from "path";
+import * as http  from "http";
+import * as https from "https";
+
+const httpAgent  = new http.Agent({ keepAlive: true, maxSockets: 1000 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 1000 });
+
+async function sendRawTransactions(txs: Transaction[], apiUrl: string): Promise<number> {
+  const payload = JSON.stringify(txs.map(t => t.toSendable()));
+  const isHttps = apiUrl.startsWith("https");
+  const agent   = isHttps ? httpsAgent : httpAgent;
+  const urlBase = apiUrl.replace(/\/$/, "");
+  const url     = new URL(urlBase + "/transaction/send-multiple");
+
+  return new Promise((resolve, reject) => {
+    const req = (isHttps ? https : http).request(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload)
+        },
+        agent,
+      },
+      (res) => {
+        let body = "";
+        res.on("data", d => body += d);
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              const parsed = JSON.parse(body);
+              if (parsed.error) reject(new Error(parsed.error));
+              else resolve(parsed.data?.numOfSentTxs || txs.length);
+            } catch { resolve(txs.length); }
+          } else {
+            reject(new Error(`HTTP ${res.statusCode}: ${body}`));
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
+}
 import { CONFIG, NUM_SHARDS, getShardOfAddress } from "./config";
 
 // ── CLI args ───────────────────────────────────────────────
@@ -141,7 +186,7 @@ async function main() {
   console.log("  Fetching nonces...");
   const nonceMap    = new Map<string, bigint>();
   const balanceMap  = new Map<string, bigint>();
-  const NONCE_BATCH = 100;
+  const NONCE_BATCH = 20;
 
   for (let i = 0; i < wallets.length; i += NONCE_BATCH) {
     const batch = wallets.slice(i, i + NONCE_BATCH);
@@ -157,6 +202,7 @@ async function main() {
         }
       })
     );
+    await sleep(200); // Slow down fetch to respect rate limit
     process.stdout.write(`\r  Nonces: ${Math.min(i + NONCE_BATCH, wallets.length)}/${wallets.length}   `);
   }
   process.stdout.write("\n");
@@ -314,8 +360,8 @@ async function walletLoop(
       tx.signature = secretKey.sign(txComputer.computeBytesForSigning(tx));
       batch.push(tx);
 
-      // Yield to event loop periodically
-      if (i > 0 && i % 10 === 0) {
+      // Yield to event loop periodically (increased frequency)
+      if (i > 0 && i % 5 === 0) {
         await new Promise((resolve) => setImmediate(resolve));
       }
     }
@@ -338,7 +384,7 @@ async function walletLoop(
 
 
     try {
-      await provider.sendTransactions(batch);
+      await sendRawTransactions(batch, CONFIG.API_URL);
       const batchFees = COST_PER_TX * BigInt(batch.length);
       wStats.txSent        += batch.length;
       wStats.txSuccess     += batch.length;
@@ -359,14 +405,16 @@ async function walletLoop(
       globalTxSent    += batch.length;
       globalTxFailed  += batch.length;
 
-      if (msg.includes("500") || msg.includes("Internal Server") || msg.includes("429")) {
+      if (msg.includes("500") || msg.includes("502") || msg.includes("Internal Server") || msg.includes("429")) {
         nonce -= BigInt(batch.length);
-        await sleep(200);
-      } else if (msg.toLowerCase().includes("nonce")) {
+        await sleep(300); // Wait longer for rate limits
+      } else if (msg.toLowerCase().includes("nonce") || msg.toLowerCase().includes("mempool")) {
         try {
+          // Dynamic mempool backoff
           const netAcct = await provider.getAccount(sender);
           nonce   = BigInt(netAcct.nonce);
           balance = BigInt(netAcct.balance.toString());
+          await sleep(100);
         } catch { /* ignore */ }
       } else {
         nonce -= BigInt(batch.length);
