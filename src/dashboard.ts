@@ -179,6 +179,8 @@ header{
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.2}
 .logo-text span{font-size:.65rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
 .header-right{display:flex;align-items:center;gap:16px}
+.reset-btn{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--rose);padding:5px 12px;border-radius:6px;font-size:.7rem;font-weight:600;cursor:pointer;transition:.2s;}
+.reset-btn:hover{background:rgba(244,63,94,.2);}
 .live-badge{
   display:flex;align-items:center;gap:6px;
   padding:5px 14px;border-radius:999px;font-size:.7rem;font-weight:600;
@@ -303,6 +305,7 @@ tbody td{padding:6px;border-bottom:1px solid rgba(62,72,105,.12);
     </div>
   </div>
   <div class="header-right">
+    <button class="reset-btn" onclick="resetLogs()">Reset Data</button>
     <div class="clock" id="clock"></div>
     <div class="live-badge">LIVE</div>
   </div>
@@ -335,9 +338,9 @@ tbody td{padding:6px;border-bottom:1px solid rgba(62,72,105,.12);
       <div class="kpi-sub">rejected / errors</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Fees Spent</div>
+      <div class="kpi-label">Budget Used</div>
       <div class="kpi-val" style="color:var(--amber)" id="k-fees">0</div>
-      <div class="kpi-sub">EGLD consumed</div>
+      <div class="kpi-sub">EGLD consumed (value + gas)</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Throughput</div>
@@ -430,6 +433,16 @@ function updateClock(){
   document.getElementById('clock').textContent = local + '  ·  ' + utc;
 }
 updateClock(); setInterval(updateClock, 1000);
+
+async function resetLogs(){
+  if(!confirm('Clear all local spray logs?')) return;
+  await fetch('/api/reset', {method:'POST'});
+  document.getElementById('footer').textContent = 'Logs cleared. Waiting for new spray...';
+  // Clear charts instantly
+  chart.data.labels = [];
+  chart.data.datasets[0].data = [];
+  chart.update();
+}
 
 // Chart
 const ctx = document.getElementById('chart').getContext('2d');
@@ -546,6 +559,20 @@ refresh(); setInterval(refresh,2000);
 
 // ── HTTP Server ────────────────────────────────────────────
 function serve(req: http.IncomingMessage, res: http.ServerResponse) {
+  if (req.url === "/api/reset" && req.method === "POST") {
+    try {
+      if (fs.existsSync(RESULTS_DIR)) {
+        const files = fs.readdirSync(RESULTS_DIR).filter(f => f.startsWith("spray_part"));
+        for (const f of files) fs.unlinkSync(path.join(RESULTS_DIR, f));
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    } catch {
+      res.writeHead(500);
+      res.end("{}");
+    }
+    return;
+  }
   if (req.url === "/api/stats") {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Access-Control-Allow-Origin", "*");

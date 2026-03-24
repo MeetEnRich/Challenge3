@@ -67,9 +67,9 @@ export const CONFIG = {
   FEE_PER_TX: BigInt("50000000000000"),  // 0.00005 EGLD in atoms
 
   // ── Spray tuning ──────────────────────────────────────────
-  BATCH_SIZE:          100,     // max txs per sender in mempool
+  BATCH_SIZE:          30,      // reduced from 100 to prevent event loop block & gateway timeouts
   CONCURRENT_WALLETS:  500,     // all wallets fire simultaneously
-  STAGGER_MS:          10,      // ms between wallet launches
+  STAGGER_MS:          30,      // ms between wallet launches (spreads load over 15s)
 
   // ── Window timing (UTC → maps to local system clock) ──────
   // All times in HH:MM LOCAL (your system auto-converts)

@@ -221,7 +221,7 @@ async function main() {
       `OK: ${globalTxSuccess.toLocaleString().padStart(8)}  |  ` +
       `Fail: ${globalTxFailed.toLocaleString().padStart(6)}  |  ` +
       `${rate.padStart(5)} tx/s  |  ` +
-      `Fees: ${feesEgld} EGLD  |  ` +
+      `Budget: ${feesEgld} EGLD  |  ` +
       `${elapsed}s elapsed  |  ${timeLeft}s left`
     );
     saveLog();
@@ -238,7 +238,7 @@ async function main() {
   console.log(`  Accepted (OK)   : ${globalTxSuccess.toLocaleString()}`);
   console.log(`  Failed          : ${globalTxFailed.toLocaleString()}`);
   console.log(`  Cross-shard     : ${globalCrossShardTx.toLocaleString()}`);
-  console.log(`  Fees spent      : ${formatEgld(globalFeesSpent)} EGLD`);
+  console.log(`  Budget used     : ${formatEgld(globalFeesSpent)} EGLD`);
   console.log(`  Dry skipped     : ${dryWalletsSkipped} wallets`);
   console.log(`  Time elapsed    : ${elapsed}s`);
   console.log(`  Log             : ${LOG_FILE}\n`);

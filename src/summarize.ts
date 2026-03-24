@@ -63,7 +63,7 @@ function main() {
       console.log(`     Part: ${log.part}  |  Timestamp: ${log.timestamp}`);
       console.log(`     Cross-shard: ${log.globalCrossShardTx?.toLocaleString() || "N/A"}`);
       console.log(`     Total sent:  ${log.globalTxSent.toLocaleString()}`);
-      console.log(`     Fees:        ${log.feesSpentEgld || "N/A"} EGLD`);
+      console.log(`     Budget used: ${log.feesSpentEgld || "N/A"} EGLD`);
       console.log(`     Duration:    ${log.elapsedSeconds}s`);
       console.log(`     Wallets:     ${log.wallets.length}`);
       console.log(`     By shard:    S0:${shardSent[0]} | S1:${shardSent[1]} | S2:${shardSent[2]}`);
